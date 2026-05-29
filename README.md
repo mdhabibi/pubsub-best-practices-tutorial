@@ -46,15 +46,6 @@ cd pubsub-best-practices-tutorial
 open index.html        # macOS  (use "start" on Windows, "xdg-open" on Linux)
 ```
 
-## 🌐 Viewing the interactive version online (optional)
-
-You can publish the HTML for free with GitHub Pages:
-
-1. Push this repo to GitHub.
-2. Go to **Settings → Pages**.
-3. Under **Build and deployment**, set **Source** to `Deploy from a branch`, branch `main`, folder `/ (root)`.
-4. Wait a minute, then open `https://mdhabibi.github.io/pubsub-best-practices-tutorial/` — it serves `index.html` automatically.
-
 ## 📂 Repository structure
 
 ```
