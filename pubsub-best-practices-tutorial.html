@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pub/Sub Best Practices — A Beginner's Tutorial</title>
+<style>
+  :root{
+    --bg:#f6f8fc; --card:#ffffff; --ink:#1f2733; --muted:#5b6573;
+    --blue:#1a73e8; --blue-soft:#e8f0fe; --green:#188038; --green-soft:#e6f4ea;
+    --amber:#b06000; --amber-soft:#fef7e0; --red:#c5221f; --red-soft:#fce8e6;
+    --purple:#681da8; --purple-soft:#f3e8fd; --line:#e3e8ef; --shadow:0 1px 3px rgba(20,40,80,.08),0 6px 18px rgba(20,40,80,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       background:var(--bg);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:920px;margin:0 auto;padding:0 20px 80px}
+  header.hero{background:linear-gradient(135deg,#1a73e8,#4f46e5);color:#fff;padding:54px 20px 60px;text-align:center}
+  header.hero h1{margin:0 0 10px;font-size:2.1rem;letter-spacing:-.5px}
+  header.hero p{margin:0 auto;max-width:640px;font-size:1.05rem;opacity:.95}
+  .pill{display:inline-block;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);
+        padding:4px 12px;border-radius:999px;font-size:.8rem;margin-bottom:18px;letter-spacing:.3px}
+  h2{font-size:1.5rem;margin:46px 0 6px;letter-spacing:-.3px}
+  h2 .em{font-size:.85rem;font-weight:600;color:var(--blue);display:block;letter-spacing:.6px;text-transform:uppercase;margin-bottom:2px}
+  .lead{color:var(--muted);margin:0 0 18px;font-size:1rem}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin:14px 0;box-shadow:var(--shadow)}
+  .tip{display:flex;gap:16px;align-items:flex-start}
+  .num{flex:0 0 auto;width:38px;height:38px;border-radius:10px;background:var(--blue-soft);color:var(--blue);
+       font-weight:700;display:flex;align-items:center;justify-content:center;font-size:1.05rem}
+  .tip h3{margin:2px 0 6px;font-size:1.12rem}
+  .tip p{margin:0 0 8px;color:#374151}
+  .why{font-size:.92rem;background:var(--green-soft);border-left:4px solid var(--green);
+       padding:8px 12px;border-radius:6px;color:#13502a;margin-top:8px}
+  .why b{color:var(--green)}
+  .analogy{font-size:.92rem;background:var(--amber-soft);border-left:4px solid var(--amber);
+       padding:8px 12px;border-radius:6px;color:#6b4500;margin-top:8px}
+  .analogy b{color:var(--amber)}
+  .toc{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 22px;box-shadow:var(--shadow);margin-top:-34px;position:relative}
+  .toc h3{margin:0 0 10px;font-size:1rem;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+  .toc ol{margin:0;padding-left:20px;columns:2;column-gap:30px}
+  .toc a{color:var(--blue);text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+  .diagram{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow);margin:18px 0;text-align:center}
+  .diagram svg{max-width:100%;height:auto}
+  .cap{font-size:.85rem;color:var(--muted);margin-top:8px}
+  .sectionbar{display:inline-block;font-size:.8rem;font-weight:700;color:#fff;padding:3px 12px;border-radius:999px;margin-bottom:4px}
+  .glossary dt{font-weight:700;margin-top:12px;color:var(--blue)}
+  .glossary dd{margin:2px 0 0;color:#374151}
+  .keymap{font-size:.9rem;color:var(--muted)}
+  footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);font-size:.88rem;color:var(--muted)}
+  footer a{color:var(--blue)}
+  /* GCP console mockups */
+  .win{border:1px solid #d9dee6;border-radius:12px;overflow:hidden;box-shadow:var(--shadow);background:#fff;margin:16px 0 6px;font-size:.9rem}
+  .winbar{display:flex;align-items:center;gap:6px;background:#f1f3f4;border-bottom:1px solid #e3e8ef;padding:8px 12px}
+  .winbar .dot{width:11px;height:11px;border-radius:50%}
+  .winbar .url{flex:1;background:#fff;border:1px solid #e3e8ef;border-radius:6px;padding:3px 10px;font-size:.76rem;color:#5b6573;margin-left:8px;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gtop{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid #eceff3;color:#3c4043;font-weight:600}
+  .gtop .logo{color:#5f6368}.gtop .logo b1{color:#4285f4}
+  .gbody{padding:16px 18px}
+  .gcrumb{font-size:.76rem;color:#80868b;margin-bottom:4px}
+  .gtitle{font-size:1.05rem;font-weight:700;color:#202124;margin:0 0 14px}
+  .gfield{margin-bottom:12px}
+  .glabel{display:block;font-size:.78rem;color:#5f6368;margin-bottom:3px}
+  .ginput{border:1px solid #c4c9d0;border-radius:6px;padding:7px 10px;color:#202124;background:#fff}
+  .ginput .ph{color:#9aa3b0}
+  .gradio{display:flex;gap:18px;margin:4px 0 2px}
+  .gradio span{display:flex;align-items:center;gap:6px;font-size:.86rem;color:#3c4043}
+  .gdotr{width:15px;height:15px;border-radius:50%;border:2px solid #1a73e8;display:inline-block;position:relative}
+  .gdotr.on:after{content:"";position:absolute;inset:3px;border-radius:50%;background:#1a73e8}
+  .gdotr.off{border-color:#bdc1c6}
+  .gcheck{display:flex;align-items:center;gap:8px;font-size:.86rem;color:#3c4043;margin:7px 0}
+  .gck{width:16px;height:16px;border-radius:3px;background:#1a73e8;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:11px}
+  .gck.off{background:#fff;border:2px solid #bdc1c6}
+  .gbtn{display:inline-block;background:#1a73e8;color:#fff;border-radius:6px;padding:7px 18px;font-size:.82rem;font-weight:600;margin-top:6px}
+  .gbtn.sec{background:#fff;color:#1a73e8;border:1px solid #dadce0}
+  .gtiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .gtile{border:1px solid #e6e9ee;border-radius:8px;padding:10px 12px}
+  .gtile .t{font-size:.74rem;color:#80868b}
+  .gtile .v{font-size:1.15rem;font-weight:700;color:#202124}
+  .gtile.ok .v{color:#188038}.gtile.warn .v{color:#b06000}
+  .spark{height:22px;margin-top:6px;display:flex;align-items:flex-end;gap:3px}
+  .spark i{flex:1;background:#cfe0fb;border-radius:2px 2px 0 0;display:block}
+  .term{background:#202124;color:#e8eaed;border-radius:0 0 12px 12px;font-family:monospace;font-size:.82rem;padding:14px 16px;line-height:1.7}
+  .term .p{color:#8ab4f8}.term .ok{color:#81c995}.term .c{color:#9aa3b0}
+  .gtoggle{display:flex;align-items:center;gap:10px;font-size:.86rem;color:#3c4043;margin-bottom:10px}
+  .gsw{width:34px;height:18px;border-radius:999px;background:#1a73e8;position:relative;display:inline-block}
+  .gsw:after{content:"";position:absolute;top:2px;right:2px;width:14px;height:14px;border-radius:50%;background:#fff}
+  .giamrow{display:flex;align-items:center;justify-content:space-between;border:1px solid #e6e9ee;border-radius:8px;padding:9px 12px;margin-bottom:8px}
+  .giamrow .who{font-size:.84rem;color:#202124}.giamrow .who small{display:block;color:#80868b;font-family:monospace;font-size:.72rem}
+  .grole{font-size:.78rem;background:#e8f0fe;color:#1a73e8;padding:3px 10px;border-radius:999px;font-weight:600}
+  .shot-note{font-size:.74rem;color:#9aa3b0;font-style:italic;margin:2px 0 18px}
+  /* code snippets */
+  .code{background:#1b1f24;border-radius:9px;margin:12px 0 2px;overflow:hidden}
+  .code .lang{display:block;background:#11151a;color:#8ab4f8;padding:4px 12px;font-size:.66rem;letter-spacing:.8px;font-weight:700;font-family:monospace}
+  .code pre{margin:0;padding:12px 14px;color:#e8eaed;overflow-x:auto;line-height:1.6;font-size:.8rem;
+            font-family:"SF Mono",Menlo,Consolas,monospace;white-space:pre}
+  .code .c{color:#9aa3b0}   /* comments */
+  .code .s{color:#81c995}   /* strings  */
+  .code .k{color:#c792ea}   /* keywords */
+  .code .f{color:#82aaff}   /* funcs    */
+  .badge-pub{background:#1a73e8}.badge-sub{background:#188038}.badge-rel{background:#c5221f}
+  .badge-lib{background:#681da8}.badge-feat{background:#b06000}.badge-pat{background:#0b8043}
+  .checklist{list-style:none;padding:0;margin:0}
+  .checklist li{padding:8px 0 8px 30px;position:relative;border-bottom:1px dashed var(--line)}
+  .checklist li:before{content:"✓";position:absolute;left:0;top:8px;color:var(--green);font-weight:700}
+  .checklist li:last-child{border-bottom:none}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="pill">BEGINNER-FRIENDLY TUTORIAL</div>
+  <h1>Pub/Sub Best Practices, Made Simple</h1>
+  <p>A plain-English walkthrough of Pub/Sub best practices — with diagrams, analogies, and the "why" behind each one.</p>
+</header>
+
+<div class="wrap">
+
+  <nav class="toc">
+    <h3>What you'll learn</h3>
+    <ol>
+      <li><a href="#intro">What Pub/Sub even is</a></li>
+      <li><a href="#publishing">Publishing messages</a></li>
+      <li><a href="#subscribing">Subscribing to messages</a></li>
+      <li><a href="#latency">Latency &amp; reliability</a></li>
+      <li><a href="#library">Client library tips</a></li>
+      <li><a href="#features">Handy built-in features</a></li>
+      <li><a href="#patterns">Patterns, testing &amp; experimentation</a></li>
+      <li><a href="#glossary">Glossary &amp; checklist</a></li>
+    </ol>
+  </nav>
+
+  <!-- INTRO -->
+  <section id="intro">
+    <h2><span class="em">Start here</span>What is Pub/Sub?</h2>
+    <p class="lead">Before the tips, here's the one idea everything builds on.</p>
+    <div class="card">
+      <p><strong>Pub/Sub</strong> (short for <em>Publish / Subscribe</em>) is a messaging service that lets different parts of your software talk to each other <strong>without waiting on one another</strong>. One part sends out a message and immediately moves on; other parts pick it up whenever they're ready.</p>
+      <div class="analogy"><b>Analogy:</b> Think of a radio station. The station (a <em>publisher</em>) broadcasts a song to a <em>topic</em> (a channel). Anyone with a radio tuned to that channel (a <em>subscriber</em>) hears it. The station doesn't know or care who's listening, and listeners don't slow the station down. That loose connection is called being <em>decoupled</em>.</div>
+    </div>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram: publishers send messages to a topic, which delivers to subscribers">
+        <defs>
+          <marker id="arr" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
+            <path d="M0,0 L7,3 L0,6 Z" fill="#5b6573"/>
+          </marker>
+        </defs>
+        <!-- publishers -->
+        <rect x="20" y="40" width="130" height="44" rx="9" fill="#e8f0fe" stroke="#1a73e8"/>
+        <text x="85" y="67" text-anchor="middle" font-size="14" fill="#1a73e8" font-weight="700">Publisher A</text>
+        <rect x="20" y="136" width="130" height="44" rx="9" fill="#e8f0fe" stroke="#1a73e8"/>
+        <text x="85" y="163" text-anchor="middle" font-size="14" fill="#1a73e8" font-weight="700">Publisher B</text>
+        <!-- topic -->
+        <rect x="300" y="78" width="160" height="64" rx="12" fill="#fef7e0" stroke="#b06000" stroke-width="2"/>
+        <text x="380" y="105" text-anchor="middle" font-size="15" fill="#b06000" font-weight="700">TOPIC</text>
+        <text x="380" y="124" text-anchor="middle" font-size="11" fill="#6b4500">"orders"</text>
+        <!-- subscribers -->
+        <rect x="610" y="20" width="130" height="40" rx="9" fill="#e6f4ea" stroke="#188038"/>
+        <text x="675" y="45" text-anchor="middle" font-size="13" fill="#188038" font-weight="700">Subscriber 1</text>
+        <rect x="610" y="90" width="130" height="40" rx="9" fill="#e6f4ea" stroke="#188038"/>
+        <text x="675" y="115" text-anchor="middle" font-size="13" fill="#188038" font-weight="700">Subscriber 2</text>
+        <rect x="610" y="160" width="130" height="40" rx="9" fill="#e6f4ea" stroke="#188038"/>
+        <text x="675" y="185" text-anchor="middle" font-size="13" fill="#188038" font-weight="700">Subscriber 3</text>
+        <!-- arrows in -->
+        <line x1="150" y1="62" x2="298" y2="100" stroke="#5b6573" stroke-width="2" marker-end="url(#arr)"/>
+        <line x1="150" y1="158" x2="298" y2="120" stroke="#5b6573" stroke-width="2" marker-end="url(#arr)"/>
+        <!-- arrows out -->
+        <line x1="460" y1="100" x2="608" y2="42" stroke="#5b6573" stroke-width="2" marker-end="url(#arr)"/>
+        <line x1="460" y1="110" x2="608" y2="110" stroke="#5b6573" stroke-width="2" marker-end="url(#arr)"/>
+        <line x1="460" y1="120" x2="608" y2="178" stroke="#5b6573" stroke-width="2" marker-end="url(#arr)"/>
+      </svg>
+      <div class="cap"><b>The whole picture:</b> Publishers drop messages into a <em>topic</em>. A <em>subscription</em> attached to that topic delivers copies to each subscriber. Everyone works at their own pace.</div>
+    </div>
+    <p class="keymap">Four words to remember: <b>Topic</b> = the channel · <b>Message</b> = the data being sent · <b>Publisher</b> = sends messages · <b>Subscriber</b> = receives them (through a <b>subscription</b>).</p>
+  </section>
+
+  <!-- PUBLISHING -->
+  <section id="publishing">
+    <h2><span class="em">Sending messages well</span>Publishing Best Practices</h2>
+    <p class="lead">How to send messages efficiently and reliably.</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Batching diagram: four messages combined into one batch and sent in a single request">
+        <defs><marker id="arrP" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#5b6573"/></marker></defs>
+        <text x="80" y="24" text-anchor="middle" font-size="12" fill="#5b6573" font-weight="700">4 messages</text>
+        <rect x="40" y="36" width="80" height="26" rx="6" fill="#e8f0fe" stroke="#1a73e8"/><text x="80" y="54" text-anchor="middle" font-size="11" fill="#1a73e8">msg 1</text>
+        <rect x="40" y="70" width="80" height="26" rx="6" fill="#e8f0fe" stroke="#1a73e8"/><text x="80" y="88" text-anchor="middle" font-size="11" fill="#1a73e8">msg 2</text>
+        <rect x="40" y="104" width="80" height="26" rx="6" fill="#e8f0fe" stroke="#1a73e8"/><text x="80" y="122" text-anchor="middle" font-size="11" fill="#1a73e8">msg 3</text>
+        <rect x="40" y="138" width="80" height="26" rx="6" fill="#e8f0fe" stroke="#1a73e8"/><text x="80" y="156" text-anchor="middle" font-size="11" fill="#1a73e8">msg 4</text>
+        <!-- into batch -->
+        <line x1="120" y1="100" x2="268" y2="100" stroke="#5b6573" stroke-width="2" marker-end="url(#arrP)"/>
+        <rect x="280" y="64" width="150" height="72" rx="12" fill="#fef7e0" stroke="#b06000" stroke-width="2"/>
+        <text x="355" y="94" text-anchor="middle" font-size="14" fill="#b06000" font-weight="700">1 BATCH</text>
+        <text x="355" y="114" text-anchor="middle" font-size="11" fill="#6b4500">(one request)</text>
+        <!-- to topic -->
+        <line x1="430" y1="100" x2="568" y2="100" stroke="#5b6573" stroke-width="2" marker-end="url(#arrP)"/>
+        <rect x="580" y="70" width="150" height="60" rx="12" fill="#e6f4ea" stroke="#188038" stroke-width="2"/>
+        <text x="655" y="105" text-anchor="middle" font-size="14" fill="#188038" font-weight="700">TOPIC</text>
+      </svg>
+      <div class="cap"><b>Batching:</b> group several messages into one request — fewer trips, lower cost, higher throughput (at the price of a tiny wait).</div>
+    </div>
+
+    <div class="win">
+      <div class="winbar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">console.cloud.google.com › cloudpubsub › topic › create</span></div>
+      <div class="gtop"><span class="logo">☰&nbsp;&nbsp;<b1 style="color:#4285f4">Google</b1> Cloud</span><span style="color:#80868b;font-weight:400">Pub/Sub</span></div>
+      <div class="gbody">
+        <div class="gcrumb">Pub/Sub &rsaquo; Topics &rsaquo; Create topic</div>
+        <div class="gtitle">Create a topic</div>
+        <div class="gfield"><span class="glabel">Topic ID *</span><div class="ginput">orders</div></div>
+        <div class="gcheck"><span class="gck">✓</span> Add a default subscription</div>
+        <div class="gcheck"><span class="gck off"></span> Use a schema</div>
+        <div class="gcheck"><span class="gck">✓</span> Enable message retention &nbsp;<span style="color:#80868b">— Retain for <b>7 days</b></span></div>
+        <span class="gbtn">CREATE</span> &nbsp;<span class="gbtn sec">CANCEL</span>
+      </div>
+    </div>
+    <p class="shot-note">Illustrative view of the GCP console — Pub/Sub → Topics → “Create topic”. Note the option to add a default subscription and enable retention <em>before</em> you publish.</p>
+
+    <div class="card"><div class="tip"><div class="num">1</div><div>
+      <h3>Batch your messages</h3>
+      <p>Instead of sending each message in its own request, group several together and send them as one batch. The client libraries do this automatically by default.</p>
+      <div class="analogy"><b>Analogy:</b> Mailing 10 letters in one envelope instead of 10 separate envelopes — cheaper and faster.</div>
+      <div class="why"><b>Trade-off:</b> Batching boosts throughput and lowers cost, but a message waits a moment for the batch to fill, so it adds a little latency. Tune the batch by size, message count, or time.</div>
+      <div class="code"><span class="lang">PYTHON</span><pre><span class="k">from</span> google.cloud <span class="k">import</span> pubsub_v1
+
+<span class="c"># Send a batch when it hits 100 msgs, 1 KB, OR 10 ms — whichever first</span>
+batch = pubsub_v1.types.<span class="f">BatchSettings</span>(
+    max_messages=<span class="s">100</span>, max_bytes=<span class="s">1024</span>, max_latency=<span class="s">0.01</span>,
+)
+publisher = pubsub_v1.<span class="f">PublisherClient</span>(batch_settings=batch)</pre></div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">2</div><div>
+      <h3>Be careful with ordering keys</h3>
+      <p>An <em>ordering key</em> guarantees messages are delivered in the order you sent them. Only use it when order genuinely matters (e.g. "account created" before "account updated").</p>
+      <div class="why"><b>Why be careful:</b> Ordering limits how much work can run in parallel, which can slow you down. If you do use it, publish to a single region with a <em>locational endpoint</em>, and set up a "resume publishing" function so one failure doesn't permanently block that key.</div>
+      <div class="code"><span class="lang">PYTHON</span><pre><span class="c"># Turn ordering ON, then publish with an ordering key</span>
+opts = pubsub_v1.types.<span class="f">PublisherOptions</span>(enable_message_ordering=<span class="k">True</span>)
+publisher = pubsub_v1.<span class="f">PublisherClient</span>(publisher_options=opts)
+
+publisher.<span class="f">publish</span>(topic_path, <span class="s">b"order placed"</span>, ordering_key=<span class="s">"user-123"</span>)
+<span class="c"># after a failure, unblock that key:</span>
+publisher.<span class="f">resume_publish</span>(topic_path, ordering_key=<span class="s">"user-123"</span>)</pre></div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">3</div><div>
+      <h3>Use a regional endpoint when it helps</h3>
+      <p>By default Pub/Sub routes your publish to the nearest region automatically. But you can pin publishing to a specific region with a locational endpoint.</p>
+      <div class="why"><b>Why:</b> This is essential for ordered messages (order is only preserved within one region) and useful for meeting data-locality requirements.</div>
+      <div class="code"><span class="lang">PYTHON</span><pre><span class="k">from</span> google.api_core <span class="k">import</span> client_options
+
+<span class="c"># Pin publishing to a specific region's endpoint</span>
+opts = client_options.<span class="f">ClientOptions</span>(
+    api_endpoint=<span class="s">"us-east1-pubsub.googleapis.com:443"</span>)
+publisher = pubsub_v1.<span class="f">PublisherClient</span>(client_options=opts)</pre></div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">4</div><div>
+      <h3>Consider your bandwidth</h3>
+      <p>Your publishing speed is limited by network bandwidth and how many requests you send. If bandwidth is fine but latency is high, don't flood the system with many tiny requests.</p>
+      <div class="why"><b>Why:</b> Understanding your network ceiling helps you pick batch sizes and flow-control settings that actually fit your machine.</div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">5</div><div>
+      <h3>Provision your publishers (flow control)</h3>
+      <p>Give publishers enough CPU, memory, and threads — and turn on <em>flow control</em> so a sudden spike of messages doesn't pile up in memory and fail.</p>
+      <div class="analogy"><b>Analogy:</b> A bouncer at a club entrance — flow control limits how many messages are "in flight" at once so your app never gets overwhelmed.</div>
+      <div class="why"><b>Symptom it prevents:</b> the dreaded <code>Deadline exceeded</code> errors when a publisher runs out of resources.</div>
+      <div class="code"><span class="lang">PYTHON</span><pre><span class="k">from</span> google.cloud.pubsub_v1.types <span class="k">import</span> (
+    PublishFlowControl, PublisherOptions, LimitExceededBehavior)
+
+fc = <span class="f">PublishFlowControl</span>(
+    message_limit=<span class="s">1000</span>,
+    byte_limit=<span class="s">10</span> * <span class="s">1024</span> * <span class="s">1024</span>,            <span class="c"># 10 MB</span>
+    limit_exceeded_behavior=LimitExceededBehavior.BLOCK)  <span class="c"># wait, don't crash</span>
+publisher = pubsub_v1.<span class="f">PublisherClient</span>(
+    publisher_options=<span class="f">PublisherOptions</span>(flow_control=fc))</pre></div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">6</div><div>
+      <h3>Customize retry settings — only if needed</h3>
+      <p>If a publish fails, Pub/Sub automatically retries with sensible defaults (it waits a bit longer between each attempt). You <em>can</em> change these, but most people never need to.</p>
+      <div class="why"><b>Rule of thumb:</b> Leave defaults alone unless you're on a flaky or bandwidth-limited connection. For high volume, adjust batching and flow control first, not retry timing.</div>
+      <div class="code"><span class="lang">PYTHON</span><pre><span class="k">from</span> google.api_core <span class="k">import</span> retry
+
+<span class="c"># Override the default retry only if you really need to</span>
+future = publisher.<span class="f">publish</span>(
+    topic_path, <span class="s">b"data"</span>,
+    retry=retry.<span class="f">Retry</span>(deadline=<span class="s">300</span>))   <span class="c"># keep retrying up to 5 min</span></pre></div>
+    </div></div></div>
+
+    <div class="card" style="background:var(--blue-soft);border-color:#c2d7fb">
+      <strong>Bonus tip from the docs:</strong> Always <em>check the result</em> of a publish. The library hands back a "future" — read it asynchronously so you know whether the message actually made it, and decide what to do on failure (log, retry, or save for later).
+      <div class="code"><span class="lang">PYTHON</span><pre>future = publisher.<span class="f">publish</span>(topic_path, <span class="s">b"data"</span>)
+
+<span class="k">def</span> <span class="f">on_done</span>(f):
+    <span class="k">try</span>:
+        print(<span class="s">"published:"</span>, f.<span class="f">result</span>())   <span class="c"># message ID on success</span>
+    <span class="k">except</span> Exception <span class="k">as</span> e:
+        log.<span class="f">error</span>(<span class="s">"publish failed: %s"</span>, e)  <span class="c"># handle / retry / save</span>
+
+future.<span class="f">add_done_callback</span>(on_done)        <span class="c"># non-blocking</span></pre></div>
+    </div>
+  </section>
+
+  <!-- SUBSCRIBING -->
+  <section id="subscribing">
+    <h2><span class="em">Receiving messages well</span>Subscribing Best Practices</h2>
+    <p class="lead">How to reliably receive and process what's been sent.</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pull versus push subscription comparison">
+        <defs><marker id="arrS" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#5b6573"/></marker></defs>
+        <!-- PULL row -->
+        <text x="30" y="44" font-size="13" fill="#1a73e8" font-weight="700">PULL</text>
+        <rect x="100" y="22" width="120" height="46" rx="9" fill="#fef7e0" stroke="#b06000"/><text x="160" y="50" text-anchor="middle" font-size="13" fill="#b06000" font-weight="700">Topic</text>
+        <rect x="560" y="22" width="160" height="46" rx="9" fill="#e6f4ea" stroke="#188038"/><text x="640" y="50" text-anchor="middle" font-size="13" fill="#188038" font-weight="700">Subscriber</text>
+        <line x1="558" y1="38" x2="222" y2="38" stroke="#5b6573" stroke-width="2" marker-end="url(#arrS)"/>
+        <text x="390" y="32" text-anchor="middle" font-size="11" fill="#5b6573">"any messages for me?"</text>
+        <line x1="222" y1="56" x2="558" y2="56" stroke="#188038" stroke-width="2" marker-end="url(#arrS)"/>
+        <text x="390" y="74" text-anchor="middle" font-size="11" fill="#188038">delivers when asked</text>
+        <line x1="40" y1="100" x2="720" y2="100" stroke="#e3e8ef" stroke-width="1"/>
+        <!-- PUSH row -->
+        <text x="30" y="168" font-size="13" fill="#c5221f" font-weight="700">PUSH</text>
+        <rect x="100" y="146" width="120" height="46" rx="9" fill="#fef7e0" stroke="#b06000"/><text x="160" y="174" text-anchor="middle" font-size="13" fill="#b06000" font-weight="700">Topic</text>
+        <rect x="560" y="146" width="160" height="46" rx="9" fill="#fce8e6" stroke="#c5221f"/><text x="640" y="168" text-anchor="middle" font-size="12" fill="#c5221f" font-weight="700">Your URL</text>
+        <text x="640" y="184" text-anchor="middle" font-size="10" fill="#a01512">(endpoint)</text>
+        <line x1="222" y1="169" x2="558" y2="169" stroke="#5b6573" stroke-width="2" marker-end="url(#arrS)"/>
+        <text x="390" y="162" text-anchor="middle" font-size="11" fill="#5b6573">sent automatically on arrival</text>
+      </svg>
+      <div class="cap"><b>Pull vs. Push:</b> Pull = your app asks for messages when ready (like checking a mailbox). Push = Pub/Sub delivers to your URL the moment a message arrives (like a letter through the slot).</div>
+    </div>
+
+    <div class="win">
+      <div class="winbar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">console.cloud.google.com › cloudpubsub › subscription › create</span></div>
+      <div class="gtop"><span class="logo">☰&nbsp;&nbsp;<b1 style="color:#4285f4">Google</b1> Cloud</span><span style="color:#80868b;font-weight:400">Pub/Sub</span></div>
+      <div class="gbody">
+        <div class="gcrumb">Pub/Sub &rsaquo; Subscriptions &rsaquo; Create subscription</div>
+        <div class="gtitle">Add subscription to topic</div>
+        <div class="gfield"><span class="glabel">Subscription ID *</span><div class="ginput">orders-sub</div></div>
+        <div class="gfield"><span class="glabel">Pub/Sub topic *</span><div class="ginput">projects/my-app/topics/orders</div></div>
+        <div class="gfield"><span class="glabel">Delivery type</span>
+          <div class="gradio"><span><i class="gdotr on"></i> Pull</span><span><i class="gdotr off"></i> Push</span><span><i class="gdotr off"></i> BigQuery</span></div>
+        </div>
+        <div class="gfield"><span class="glabel">Acknowledgement deadline</span><div class="ginput">10 <span class="ph">seconds</span></div></div>
+        <span class="gbtn">CREATE</span> &nbsp;<span class="gbtn sec">CANCEL</span>
+      </div>
+    </div>
+    <p class="shot-note">Illustrative view — Pub/Sub → Subscriptions → “Create subscription”. This is where you pick <em>Pull vs. Push</em> and set the acknowledgement deadline.</p>
+
+    <div class="card"><div class="tip"><div class="num">1</div><div>
+      <h3>Attach a subscription <em>before</em> you publish</h3>
+      <p>A topic with no subscription is like shouting into an empty room — messages aren't stored and are lost forever.</p>
+      <div class="why"><b>Fix:</b> Create the subscription first, or turn on <em>topic message retention</em> so early messages can still be replayed later.</div>
+      <div class="code"><span class="lang">PYTHON</span><pre>subscriber = pubsub_v1.<span class="f">SubscriberClient</span>()
+sub_path = subscriber.<span class="f">subscription_path</span>(<span class="s">"my-app"</span>, <span class="s">"orders-sub"</span>)
+
+<span class="c"># Attach the subscription BEFORE you publish</span>
+subscriber.<span class="f">create_subscription</span>(
+    request={<span class="s">"name"</span>: sub_path, <span class="s">"topic"</span>: topic_path})</pre></div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">2</div><div>
+      <h3>Choose the right subscription type</h3>
+      <p>Two common styles: <b>Pull</b> (your app asks for messages when it's ready) and <b>Push</b> (Pub/Sub sends messages to your web URL automatically). There are also <em>export</em> subscriptions that write straight to BigQuery or Cloud Storage.</p>
+      <div class="analogy"><b>Analogy:</b> Pull = checking your mailbox when you feel like it. Push = having mail shoved through your letter slot the moment it arrives.</div>
+      <div class="why"><b>Tip:</b> For most apps, use the high-level client library with a pull subscription. Choose push when your code can't run a long-lived client.</div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">3</div><div>
+      <h3>Process the message <em>before</em> acknowledging it</h3>
+      <p>Acknowledging ("ack") tells Pub/Sub "I've got this, you can forget it." Do your actual work first, then ack.</p>
+      <div class="why"><b>Why it matters:</b> If you ack first and then your processing crashes, the message is gone — Pub/Sub won't send it again.</div>
+      <div class="code"><span class="lang">PYTHON</span><pre><span class="k">def</span> <span class="f">callback</span>(message):
+    <span class="f">handle</span>(message.data)   <span class="c"># 1) do the real work FIRST</span>
+    message.<span class="f">ack</span>()             <span class="c"># 2) only then acknowledge</span>
+
+subscriber.<span class="f">subscribe</span>(sub_path, callback=callback)</pre></div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">4</div><div>
+      <h3>Acknowledge messages promptly</h3>
+      <p>Once a message is safely processed, ack it quickly. If you don't ack before the deadline, Pub/Sub assumes it failed and redelivers it.</p>
+      <div class="why"><b>Why:</b> Slow acks cause the same messages to be delivered over and over, wasting work. Always design so your app can tolerate the occasional duplicate (Pub/Sub guarantees "at-least-once" delivery).</div>
+      <div class="code"><span class="lang">PYTHON</span><pre><span class="k">def</span> <span class="f">callback</span>(message):
+    <span class="k">try</span>:
+        <span class="f">handle</span>(message.data)
+        message.<span class="f">ack</span>()      <span class="c"># success → remove from the queue</span>
+    <span class="k">except</span> Exception:
+        message.<span class="f">nack</span>()     <span class="c"># failure → ask for redelivery</span></pre></div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">5</div><div>
+      <h3>Consider StreamingPull</h3>
+      <p>StreamingPull keeps an open connection so messages flow to your subscriber continuously, instead of asking again and again.</p>
+      <div class="why"><b>Why:</b> It gives the highest throughput and lowest latency for steady, high-volume workloads.</div>
+      <div class="code"><span class="lang">PYTHON</span><pre><span class="c"># subscribe() uses StreamingPull under the hood — keep it open</span>
+streaming_pull = subscriber.<span class="f">subscribe</span>(sub_path, callback=callback)
+<span class="k">with</span> subscriber:
+    <span class="k">try</span>:
+        streaming_pull.<span class="f">result</span>()        <span class="c"># block & keep receiving</span>
+    <span class="k">except</span> KeyboardInterrupt:
+        streaming_pull.<span class="f">cancel</span>()</pre></div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">6</div><div>
+      <h3>Use flow control on the subscriber too</h3>
+      <p>Set limits on how many messages (and how many bytes) your subscriber holds at once, so a traffic spike doesn't crush it.</p>
+      <div class="analogy"><b>Analogy:</b> Only grabbing as many plates as you can carry, instead of letting the whole buffet land on you at once.</div>
+      <div class="code"><span class="lang">PYTHON</span><pre><span class="c"># Hold at most 100 messages / 10 MB in flight at a time</span>
+flow = pubsub_v1.types.<span class="f">FlowControl</span>(
+    max_messages=<span class="s">100</span>, max_bytes=<span class="s">10</span> * <span class="s">1024</span> * <span class="s">1024</span>)
+subscriber.<span class="f">subscribe</span>(sub_path, callback=callback, flow_control=flow)</pre></div>
+    </div></div></div>
+  </section>
+
+  <!-- LATENCY & RELIABILITY -->
+  <section id="latency">
+    <h2><span class="em">Fast and dependable</span>Latency &amp; Reliability</h2>
+    <p class="lead">Keep delivery quick and your service trustworthy.</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Regional isolation: if one region fails, another keeps running">
+        <!-- Region A healthy -->
+        <rect x="30" y="30" width="300" height="150" rx="14" fill="#e6f4ea" stroke="#188038" stroke-width="2"/>
+        <text x="180" y="56" text-anchor="middle" font-size="13" fill="#188038" font-weight="700">Region A — healthy</text>
+        <circle cx="180" cy="110" r="34" fill="#fff" stroke="#188038" stroke-width="2"/>
+        <text x="180" y="115" text-anchor="middle" font-size="22" fill="#188038">✓</text>
+        <text x="180" y="166" text-anchor="middle" font-size="11" fill="#13502a">still serving traffic</text>
+        <!-- Region B down -->
+        <rect x="430" y="30" width="300" height="150" rx="14" fill="#fce8e6" stroke="#c5221f" stroke-width="2"/>
+        <text x="580" y="56" text-anchor="middle" font-size="13" fill="#c5221f" font-weight="700">Region B — outage</text>
+        <circle cx="580" cy="110" r="34" fill="#fff" stroke="#c5221f" stroke-width="2"/>
+        <text x="580" y="118" text-anchor="middle" font-size="24" fill="#c5221f">✕</text>
+        <text x="580" y="166" text-anchor="middle" font-size="11" fill="#a01512">fails on its own</text>
+        <!-- divider -->
+        <text x="380" y="115" text-anchor="middle" font-size="26" fill="#9aa3b0">⟂</text>
+      </svg>
+      <div class="cap"><b>Regional isolation:</b> spread work across regions so a problem in one doesn't take the whole system down — don't keep all your eggs in one basket.</div>
+    </div>
+
+    <div class="win">
+      <div class="winbar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">console.cloud.google.com › cloudpubsub › subscription › detail › metrics</span></div>
+      <div class="gtop"><span class="logo">☰&nbsp;&nbsp;<b1 style="color:#4285f4">Google</b1> Cloud</span><span style="color:#80868b;font-weight:400">Pub/Sub · Monitoring</span></div>
+      <div class="gbody">
+        <div class="gcrumb">Pub/Sub &rsaquo; Subscriptions &rsaquo; orders-sub &rsaquo; Metrics</div>
+        <div class="gtitle">Subscription metrics</div>
+        <div class="gtiles">
+          <div class="gtile"><div class="t">Publish requests / sec</div><div class="v">1.2k</div><div class="spark"><i style="height:40%"></i><i style="height:55%"></i><i style="height:48%"></i><i style="height:70%"></i><i style="height:62%"></i><i style="height:80%"></i></div></div>
+          <div class="gtile warn"><div class="t">Unacked messages (backlog)</div><div class="v">312</div><div class="spark"><i style="height:20%"></i><i style="height:35%"></i><i style="height:50%"></i><i style="height:65%"></i><i style="height:78%"></i><i style="height:90%;background:#fdd5a8"></i></div></div>
+          <div class="gtile"><div class="t">Oldest unacked age</div><div class="v">4s</div><div class="spark"><i style="height:30%"></i><i style="height:28%"></i><i style="height:35%"></i><i style="height:30%"></i><i style="height:40%"></i><i style="height:36%"></i></div></div>
+          <div class="gtile ok"><div class="t">Delivery latency health</div><div class="v">OK</div><div class="spark"><i style="height:80%;background:#b7e1c4"></i><i style="height:85%;background:#b7e1c4"></i><i style="height:82%;background:#b7e1c4"></i><i style="height:88%;background:#b7e1c4"></i><i style="height:90%;background:#b7e1c4"></i><i style="height:86%;background:#b7e1c4"></i></div></div>
+        </div>
+      </div>
+    </div>
+    <p class="shot-note">Illustrative view — the subscription’s “Metrics” tab in Cloud Monitoring. A rising <em>backlog</em> tile is your early-warning light; the health score tells you delivery is flowing smoothly.</p>
+
+    <div class="card"><div class="tip"><div class="num">1</div><div>
+      <h3>Disable client-side batching for lowest latency</h3>
+      <p>Batching saves cost but adds delay. If your priority is getting each message out <em>as fast as possible</em>, turn batching off.</p>
+      <div class="why"><b>Why:</b> It's the same trade-off in reverse — speed over efficiency. Pick based on what your app needs.</div>
+      <div class="code"><span class="lang">PYTHON</span><pre><span class="c"># max_messages=1 → every message is sent immediately (no waiting)</span>
+batch = pubsub_v1.types.<span class="f">BatchSettings</span>(max_messages=<span class="s">1</span>)
+publisher = pubsub_v1.<span class="f">PublisherClient</span>(batch_settings=batch)</pre></div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">2</div><div>
+      <h3>Consider regions</h3>
+      <p>Publish and process close to where your users and data live to cut down the round-trip time.</p>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">3</div><div>
+      <h3>Increase reliability with regional isolation</h3>
+      <p>Spreading work across regions means a problem in one region doesn't take your whole system down.</p>
+      <div class="analogy"><b>Analogy:</b> Don't keep all your eggs in one basket — if one drops, the others survive.</div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">4</div><div>
+      <h3>Watch the delivery latency health score</h3>
+      <p>Pub/Sub gives you a health score that tells you whether messages are flowing smoothly.</p>
+      <div class="why"><b>Why:</b> It's an early-warning light — check it before small slowdowns become outages.</div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">5</div><div>
+      <h3>Use the Pub/Sub metrics dashboards</h3>
+      <p>Built-in dashboards in Cloud Monitoring show throughput, backlog, and errors at a glance.</p>
+      <div class="why"><b>Why:</b> You can't fix what you can't see. Monitoring is how you spot a growing backlog of unprocessed messages.</div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">6</div><div>
+      <h3>Set up quota alerts</h3>
+      <p>Get notified <em>before</em> you hit Pub/Sub usage limits.</p>
+      <div class="why"><b>Why:</b> Hitting a quota cap unexpectedly can stall your pipeline. An alert buys you time to react.</div>
+    </div></div></div>
+  </section>
+
+  <!-- CLIENT LIBRARY -->
+  <section id="library">
+    <h2><span class="em">Using the SDK well</span>Client Library Tips</h2>
+    <p class="lead">Small habits in your code that make Pub/Sub run smoothly. (Libraries exist for Python, Java, Go, Node, C++, and more.)</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The client library sits between your app and Pub/Sub and handles batching, retries, acks and flow control">
+        <defs><marker id="arrL" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#5b6573"/></marker></defs>
+        <rect x="30" y="74" width="140" height="52" rx="10" fill="#e8f0fe" stroke="#1a73e8"/><text x="100" y="105" text-anchor="middle" font-size="13" fill="#1a73e8" font-weight="700">Your app</text>
+        <line x1="170" y1="100" x2="248" y2="100" stroke="#5b6573" stroke-width="2" marker-end="url(#arrL)"/>
+        <!-- library box -->
+        <rect x="250" y="40" width="260" height="120" rx="12" fill="#f3e8fd" stroke="#681da8" stroke-width="2"/>
+        <text x="380" y="64" text-anchor="middle" font-size="13" fill="#681da8" font-weight="700">Client library</text>
+        <rect x="266" y="78" width="110" height="26" rx="6" fill="#fff" stroke="#681da8"/><text x="321" y="96" text-anchor="middle" font-size="10" fill="#681da8">batching</text>
+        <rect x="384" y="78" width="110" height="26" rx="6" fill="#fff" stroke="#681da8"/><text x="439" y="96" text-anchor="middle" font-size="10" fill="#681da8">retries</text>
+        <rect x="266" y="112" width="110" height="26" rx="6" fill="#fff" stroke="#681da8"/><text x="321" y="130" text-anchor="middle" font-size="10" fill="#681da8">acks</text>
+        <rect x="384" y="112" width="110" height="26" rx="6" fill="#fff" stroke="#681da8"/><text x="439" y="130" text-anchor="middle" font-size="10" fill="#681da8">flow control</text>
+        <line x1="510" y1="100" x2="588" y2="100" stroke="#5b6573" stroke-width="2" marker-end="url(#arrL)"/>
+        <rect x="590" y="74" width="140" height="52" rx="10" fill="#e6f4ea" stroke="#188038"/><text x="660" y="105" text-anchor="middle" font-size="13" fill="#188038" font-weight="700">Pub/Sub</text>
+      </svg>
+      <div class="cap"><b>Let the library do the work:</b> the official client library sits between your code and Pub/Sub and handles the hard parts for you — so reusing it and keeping it updated pays off.</div>
+    </div>
+
+    <div class="win">
+      <div class="winbar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">console.cloud.google.com › Cloud Shell</span></div>
+      <div class="term">
+        <div><span class="p">you@cloudshell</span>:~$ pip install --upgrade google-cloud-pubsub</div>
+        <div class="ok">Successfully installed google-cloud-pubsub-2.21.0</div>
+        <div><span class="p">you@cloudshell</span>:~$ python publisher.py</div>
+        <div class="c"># one publisher reused for every message</div>
+        <div class="ok">Published message ID 9123847265 ✓</div>
+        <div class="ok">Published message ID 9123847266 ✓</div>
+        <div><span class="p">you@cloudshell</span>:~$ <span style="opacity:.6">▋</span></div>
+      </div>
+    </div>
+    <p class="shot-note">Illustrative view — installing and upgrading the official client library in Cloud Shell. Keeping it current and reusing one publisher are the habits shown here.</p>
+
+    <div class="card"><div class="tip"><div class="num">1</div><div>
+      <h3>Pick the right client library language</h3>
+      <p>Use the official high-level library for your language rather than calling the raw API yourself.</p>
+      <div class="why"><b>Why:</b> The libraries handle batching, flow control, retries, and acks for you — so you get the best practices "for free."</div>
+      <div class="code"><span class="lang">BASH</span><pre>pip install google-cloud-pubsub</pre></div>
+      <div class="code"><span class="lang">PYTHON</span><pre><span class="k">from</span> google.cloud <span class="k">import</span> pubsub_v1
+
+publisher  = pubsub_v1.<span class="f">PublisherClient</span>()   <span class="c"># high-level clients</span>
+subscriber = pubsub_v1.<span class="f">SubscriberClient</span>()</pre></div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">2</div><div>
+      <h3>Reuse your publisher client</h3>
+      <p>Create one publisher object and keep using it — don't make a new one for every message.</p>
+      <div class="analogy"><b>Analogy:</b> Keep one phone line open instead of dialing a fresh call for every sentence.</div>
+      <div class="code"><span class="lang">PYTHON</span><pre>publisher = pubsub_v1.<span class="f">PublisherClient</span>()   <span class="c"># create ONCE</span>
+
+<span class="k">for</span> order <span class="k">in</span> orders:
+    publisher.<span class="f">publish</span>(topic_path, order)   <span class="c"># reuse for every message</span></pre></div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">3</div><div>
+      <h3>Use flow control</h3>
+      <p>Same idea as before — let the library cap how much is in flight so your app stays stable under load.</p>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">4</div><div>
+      <h3>Always update to the latest version</h3>
+      <p>Keep your client library current.</p>
+      <div class="why"><b>Why:</b> Newer versions bring performance improvements, bug fixes, and security patches.</div>
+      <div class="code"><span class="lang">BASH</span><pre>pip install --upgrade google-cloud-pubsub</pre></div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">5</div><div>
+      <h3>Use async properly (especially in Node.js)</h3>
+      <p>Lean on the language's asynchronous features so your code doesn't block while waiting on messages.</p>
+      <div class="why"><b>Why:</b> Async handling means one slow message doesn't freeze everything else.</div>
+      <div class="code"><span class="lang">PYTHON</span><pre><span class="c"># Fire many publishes without blocking, then wait at the end</span>
+futures = [publisher.<span class="f">publish</span>(topic_path, m) <span class="k">for</span> m <span class="k">in</span> messages]
+
+<span class="k">for</span> f <span class="k">in</span> futures:
+    f.<span class="f">result</span>()   <span class="c"># they were sent concurrently, not one-by-one</span></pre></div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">6</div><div>
+      <h3>Understand lease management</h3>
+      <p>When your subscriber receives a message, it holds a "lease" — a temporary deadline to finish processing. The library can extend this automatically for messages that take a while.</p>
+      <div class="why"><b>Why:</b> Proper lease handling stops long-running tasks from being redelivered just because they took a few extra seconds.</div>
+      <div class="code"><span class="lang">PYTHON</span><pre><span class="c"># Let the library auto-extend the lease for up to 10 minutes</span>
+flow = pubsub_v1.types.<span class="f">FlowControl</span>(max_lease_duration=<span class="s">600</span>)
+subscriber.<span class="f">subscribe</span>(sub_path, callback=callback, flow_control=flow)</pre></div>
+    </div></div></div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="features">
+    <h2><span class="em">Built-in helpers</span>Handy Features</h2>
+    <p class="lead">Features that solve common problems so you don't have to build them yourself.</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Dead-letter topic: a message that fails repeatedly is moved aside instead of retried forever">
+        <defs><marker id="arrF" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#5b6573"/></marker></defs>
+        <rect x="30" y="80" width="120" height="46" rx="9" fill="#e8f0fe" stroke="#1a73e8"/><text x="90" y="108" text-anchor="middle" font-size="12" fill="#1a73e8" font-weight="700">Message</text>
+        <!-- retries -->
+        <line x1="150" y1="103" x2="228" y2="103" stroke="#5b6573" stroke-width="2" marker-end="url(#arrF)"/>
+        <rect x="230" y="80" width="150" height="46" rx="9" fill="#e6f4ea" stroke="#188038"/><text x="305" y="102" text-anchor="middle" font-size="12" fill="#188038" font-weight="700">Subscriber</text>
+        <text x="305" y="118" text-anchor="middle" font-size="10" fill="#13502a">tries 1, 2, 3…</text>
+        <!-- fail loop -->
+        <path d="M305 80 q40 -34 80 0" fill="none" stroke="#c5221f" stroke-width="2" marker-end="url(#arrF)"/>
+        <text x="345" y="42" text-anchor="middle" font-size="11" fill="#c5221f">keeps failing ✕</text>
+        <!-- to dead letter -->
+        <line x1="380" y1="103" x2="528" y2="103" stroke="#c5221f" stroke-width="2" marker-end="url(#arrF)"/>
+        <text x="455" y="94" text-anchor="middle" font-size="10" fill="#c5221f">after N tries</text>
+        <rect x="530" y="74" width="200" height="58" rx="12" fill="#fce8e6" stroke="#c5221f" stroke-width="2"/>
+        <text x="630" y="98" text-anchor="middle" font-size="12" fill="#c5221f" font-weight="700">Dead-letter topic</text>
+        <text x="630" y="116" text-anchor="middle" font-size="10" fill="#a01512">set aside for review</text>
+      </svg>
+      <div class="cap"><b>Dead-letter topic:</b> a message that fails again and again is moved to a separate bin instead of clogging your pipeline — like the undeliverable-mail tray at the post office.</div>
+    </div>
+
+    <div class="win">
+      <div class="winbar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">console.cloud.google.com › cloudpubsub › subscription › edit</span></div>
+      <div class="gtop"><span class="logo">☰&nbsp;&nbsp;<b1 style="color:#4285f4">Google</b1> Cloud</span><span style="color:#80868b;font-weight:400">Pub/Sub</span></div>
+      <div class="gbody">
+        <div class="gcrumb">Pub/Sub &rsaquo; Subscriptions &rsaquo; orders-sub &rsaquo; Edit</div>
+        <div class="gtitle">Dead lettering</div>
+        <div class="gtoggle"><span class="gsw"></span> Enable dead lettering</div>
+        <div class="gfield"><span class="glabel">Dead-letter topic</span><div class="ginput">projects/my-app/topics/orders-dlq</div></div>
+        <div class="gfield"><span class="glabel">Maximum delivery attempts</span><div class="ginput">5</div></div>
+        <span class="gbtn">UPDATE</span>
+      </div>
+    </div>
+    <p class="shot-note">Illustrative view — the “Dead lettering” section when editing a subscription. After the set number of failed attempts, messages move to your dead-letter topic.</p>
+
+    <div class="card"><div class="tip"><div class="num">1</div><div>
+      <h3>Push subscriptions</h3>
+      <p>Have Pub/Sub deliver messages directly to your web endpoint (a URL) as they arrive — great with serverless functions.</p>
+      <div class="code"><span class="lang">PYTHON</span><pre>push = pubsub_v1.types.<span class="f">PushConfig</span>(
+    push_endpoint=<span class="s">"https://myapp.com/pubsub/push"</span>)
+subscriber.<span class="f">create_subscription</span>(request={
+    <span class="s">"name"</span>: sub_path, <span class="s">"topic"</span>: topic_path, <span class="s">"push_config"</span>: push})</pre></div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">2</div><div>
+      <h3>Seek</h3>
+      <p>"Rewind" or "fast-forward" your subscription to a point in time — replay old messages or skip a backlog.</p>
+      <div class="analogy"><b>Analogy:</b> The seek bar on a video player, but for your message stream.</div>
+      <div class="code"><span class="lang">PYTHON</span><pre><span class="k">from</span> datetime <span class="k">import</span> datetime, timedelta, timezone
+
+<span class="c"># Rewind this subscription to one hour ago</span>
+one_hour_ago = datetime.<span class="f">now</span>(timezone.utc) - <span class="f">timedelta</span>(hours=<span class="s">1</span>)
+subscriber.<span class="f">seek</span>(request={<span class="s">"subscription"</span>: sub_path, <span class="s">"time"</span>: one_hour_ago})</pre></div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">3</div><div>
+      <h3>Message retention in the topic</h3>
+      <p>Store messages at the topic level so any subscription — even one created later — can replay them.</p>
+      <div class="code"><span class="lang">PYTHON</span><pre><span class="k">from</span> google.protobuf.duration_pb2 <span class="k">import</span> Duration
+
+publisher.<span class="f">create_topic</span>(request={
+    <span class="s">"name"</span>: topic_path,
+    <span class="s">"message_retention_duration"</span>: <span class="f">Duration</span>(seconds=<span class="s">7</span>*<span class="s">24</span>*<span class="s">3600</span>)})  <span class="c"># 7 days</span></pre></div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">4</div><div>
+      <h3>Message retention in the subscription</h3>
+      <p>Keep already-acknowledged messages around for a set time, in case you need to replay them with seek.</p>
+      <div class="code"><span class="lang">PYTHON</span><pre>subscriber.<span class="f">create_subscription</span>(request={
+    <span class="s">"name"</span>: sub_path, <span class="s">"topic"</span>: topic_path,
+    <span class="s">"retain_acked_messages"</span>: <span class="k">True</span>,
+    <span class="s">"message_retention_duration"</span>: <span class="f">Duration</span>(seconds=<span class="s">3</span>*<span class="s">24</span>*<span class="s">3600</span>)})</pre></div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">5</div><div>
+      <h3>Dead-letter topic</h3>
+      <p>If a message keeps failing after several tries, send it to a separate "dead-letter" topic instead of retrying forever.</p>
+      <div class="analogy"><b>Analogy:</b> The undeliverable-mail bin at the post office — problem messages get set aside so they don't block everything else.</div>
+      <div class="why"><b>Why:</b> You can inspect failures later without losing data or jamming your pipeline.</div>
+      <div class="code"><span class="lang">PYTHON</span><pre>dlq = pubsub_v1.types.<span class="f">DeadLetterPolicy</span>(
+    dead_letter_topic=dlq_topic_path,
+    max_delivery_attempts=<span class="s">5</span>)        <span class="c"># give up after 5 tries</span>
+subscriber.<span class="f">create_subscription</span>(request={
+    <span class="s">"name"</span>: sub_path, <span class="s">"topic"</span>: topic_path, <span class="s">"dead_letter_policy"</span>: dlq})</pre></div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">6</div><div>
+      <h3>Configure by region</h3>
+      <p>Use a message storage policy to control which regions your message data is stored in.</p>
+      <div class="why"><b>Why:</b> Essential for compliance — e.g. a European company keeping all data inside the EU.</div>
+      <div class="code"><span class="lang">PYTHON</span><pre><span class="c"># Only ever store this topic's data in EU regions</span>
+storage = pubsub_v1.types.<span class="f">MessageStoragePolicy</span>(
+    allowed_persistence_regions=[<span class="s">"europe-west1"</span>, <span class="s">"europe-west3"</span>])
+publisher.<span class="f">create_topic</span>(request={
+    <span class="s">"name"</span>: topic_path, <span class="s">"message_storage_policy"</span>: storage})</pre></div>
+    </div></div></div>
+  </section>
+
+  <!-- PATTERNS -->
+  <section id="patterns">
+    <h2><span class="em">Working smart</span>Patterns, Testing &amp; Experimentation</h2>
+    <p class="lead">Habits that keep a growing system clean, secure, and testable.</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Granular credentials: each subscriber gets access only to what it needs">
+        <defs><marker id="arrPt" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#188038"/></marker>
+        <marker id="arrX" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#c5221f"/></marker></defs>
+        <rect x="300" y="84" width="160" height="46" rx="9" fill="#fef7e0" stroke="#b06000"/><text x="380" y="112" text-anchor="middle" font-size="13" fill="#b06000" font-weight="700">Topic: payments</text>
+        <!-- allowed -->
+        <rect x="560" y="30" width="170" height="42" rx="9" fill="#e6f4ea" stroke="#188038"/><text x="645" y="50" text-anchor="middle" font-size="11" fill="#188038" font-weight="700">Payments service</text><text x="645" y="64" text-anchor="middle" font-size="9" fill="#13502a">🔑 has access</text>
+        <line x1="460" y1="100" x2="558" y2="56" stroke="#188038" stroke-width="2" marker-end="url(#arrPt)"/>
+        <!-- denied -->
+        <rect x="560" y="142" width="170" height="42" rx="9" fill="#fce8e6" stroke="#c5221f"/><text x="645" y="162" text-anchor="middle" font-size="11" fill="#c5221f" font-weight="700">Unrelated service</text><text x="645" y="176" text-anchor="middle" font-size="9" fill="#a01512">no access ✕</text>
+        <line x1="460" y1="112" x2="558" y2="156" stroke="#c5221f" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrX)"/>
+        <!-- key icon left -->
+        <text x="380" y="60" text-anchor="middle" font-size="11" fill="#6b4500">grant only what's needed (IAM)</text>
+      </svg>
+      <div class="cap"><b>Granular credentials:</b> give each subscriber access only to the topics it actually needs — like a hotel key card that opens just your room, not the whole building.</div>
+    </div>
+
+    <div class="win">
+      <div class="winbar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="url">console.cloud.google.com › cloudpubsub › topic › permissions</span></div>
+      <div class="gtop"><span class="logo">☰&nbsp;&nbsp;<b1 style="color:#4285f4">Google</b1> Cloud</span><span style="color:#80868b;font-weight:400">Pub/Sub · IAM</span></div>
+      <div class="gbody">
+        <div class="gcrumb">Pub/Sub &rsaquo; Topics &rsaquo; payments &rsaquo; Permissions</div>
+        <div class="gtitle">Permissions for “payments”</div>
+        <div class="giamrow"><div class="who">Payments service<small>payments-sa@my-app.iam.gserviceaccount.com</small></div><span class="grole">Pub/Sub Subscriber</span></div>
+        <div class="giamrow"><div class="who">Orders publisher<small>orders-sa@my-app.iam.gserviceaccount.com</small></div><span class="grole">Pub/Sub Publisher</span></div>
+        <span class="gbtn">+ GRANT ACCESS</span>
+      </div>
+    </div>
+    <p class="shot-note">Illustrative view — the topic’s “Permissions” tab. Each service account gets a narrow role (Subscriber or Publisher) instead of broad access.</p>
+
+    <div class="card"><div class="tip"><div class="num">1</div><div>
+      <h3>Use unique, descriptive naming</h3>
+      <p>Give topics and subscriptions clear, consistent names.</p>
+      <div class="why"><b>Why:</b> Future-you (and your teammates) will instantly know what <code>orders-prod</code> does versus <code>x1-test</code>.</div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">2</div><div>
+      <h3>Avoid the high fan-out pattern</h3>
+      <p>Be cautious about having one topic feed a huge number of subscriptions at once.</p>
+      <div class="why"><b>Why:</b> Very high fan-out can spike resource use and cost. Design deliberately.</div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">3</div><div>
+      <h3>Use granular subscriber credentials (IAM)</h3>
+      <p>Give each subscriber only the access it actually needs — not blanket permissions.</p>
+      <div class="analogy"><b>Analogy:</b> A hotel key card that opens only your room, not every door in the building.</div>
+      <div class="code"><span class="lang">BASH</span><pre><span class="c"># Grant ONE service account just the Subscriber role on ONE topic</span>
+gcloud pubsub topics add-iam-policy-binding payments \
+  --member=<span class="s">"serviceAccount:payments-sa@my-app.iam.gserviceaccount.com"</span> \
+  --role=<span class="s">"roles/pubsub.subscriber"</span></pre></div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">4</div><div>
+      <h3>Aim for consistent throughput</h3>
+      <p>Steady, predictable message rates are easier to scale for than wild spikes.</p>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">5</div><div>
+      <h3>Test locally with the Pub/Sub emulator</h3>
+      <p>The emulator lets you run Pub/Sub on your own machine — no cloud project or cost needed.</p>
+      <div class="why"><b>Why:</b> Develop and test safely before touching real, billable resources.</div>
+      <div class="code"><span class="lang">BASH</span><pre>gcloud beta emulators pubsub start --project=my-app
+export PUBSUB_EMULATOR_HOST=localhost:8085
+<span class="c"># your normal Python code now talks to the LOCAL emulator — no cost</span></pre></div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">6</div><div>
+      <h3>Add labels</h3>
+      <p>Tag your resources with labels (like <code>team:payments</code> or <code>env:prod</code>).</p>
+      <div class="why"><b>Why:</b> Labels make usage reporting and cost tracking far easier.</div>
+      <div class="code"><span class="lang">PYTHON</span><pre>publisher.<span class="f">create_topic</span>(request={
+    <span class="s">"name"</span>: topic_path,
+    <span class="s">"labels"</span>: {<span class="s">"team"</span>: <span class="s">"payments"</span>, <span class="s">"env"</span>: <span class="s">"prod"</span>}})</pre></div>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">7</div><div>
+      <h3>Consume messages by region</h3>
+      <p>Process messages close to where they're stored to reduce latency and cross-region cost.</p>
+    </div></div></div>
+
+    <div class="card"><div class="tip"><div class="num">8</div><div>
+      <h3>Set a sensible retention duration</h3>
+      <p>Pick how long messages are kept based on how long you might realistically need to replay them.</p>
+      <div class="why"><b>Why:</b> Too short risks losing data you need; too long can raise storage costs.</div>
+    </div></div></div>
+  </section>
+
+  <!-- GLOSSARY + CHECKLIST -->
+  <section id="glossary">
+    <h2><span class="em">Reference</span>Glossary &amp; Quick Checklist</h2>
+
+    <div class="card glossary">
+      <dl>
+        <dt>Topic</dt><dd>The named channel publishers send messages to.</dd>
+        <dt>Message</dt><dd>The piece of data being sent (plus optional attributes).</dd>
+        <dt>Publisher</dt><dd>Code that sends messages to a topic.</dd>
+        <dt>Subscriber</dt><dd>Code that receives messages through a subscription.</dd>
+        <dt>Subscription</dt><dd>The link between a topic and a subscriber; it holds messages until they're acknowledged.</dd>
+        <dt>Acknowledge (ack)</dt><dd>Telling Pub/Sub a message was successfully processed so it won't be redelivered.</dd>
+        <dt>Batching</dt><dd>Grouping multiple messages into one request for efficiency.</dd>
+        <dt>Flow control</dt><dd>Limiting how many messages are "in flight" so apps don't get overwhelmed.</dd>
+        <dt>Pull vs. Push</dt><dd>Pull = subscriber requests messages; Push = Pub/Sub sends them to a URL.</dd>
+        <dt>StreamingPull</dt><dd>A continuous open connection for high-throughput pulling.</dd>
+        <dt>Lease</dt><dd>The temporary deadline a subscriber has to process a message.</dd>
+        <dt>Seek</dt><dd>Rewinding or skipping ahead in a subscription's message timeline.</dd>
+        <dt>Dead-letter topic</dt><dd>A holding place for messages that repeatedly fail processing.</dd>
+        <dt>At-least-once delivery</dt><dd>Pub/Sub's promise that every message arrives — possibly more than once, so handle duplicates.</dd>
+      </dl>
+    </div>
+
+    <h3 style="margin-top:26px">The one-page checklist</h3>
+    <div class="card">
+      <ul class="checklist">
+        <li>Attach a subscription (or enable retention) <b>before</b> publishing.</li>
+        <li>Let the official client library handle batching, retries &amp; acks.</li>
+        <li>Process messages <b>before</b> you acknowledge them.</li>
+        <li>Turn on flow control on both publishers and subscribers.</li>
+        <li>Only use ordering keys when order truly matters.</li>
+        <li>Choose batching (efficiency) vs. no batching (low latency) on purpose.</li>
+        <li>Reuse one publisher client; keep the library up to date.</li>
+        <li>Add a dead-letter topic for messages that keep failing.</li>
+        <li>Monitor dashboards, the health score, and set quota alerts.</li>
+        <li>Name resources clearly, add labels, and test with the emulator.</li>
+        <li>Design so your app tolerates occasional duplicate messages.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    <p><strong>Further reading — official Google Cloud documentation:</strong></p>
+    <p><a href="https://cloud.google.com/pubsub/docs/publish-best-practices">Best practices to publish</a> · <a href="https://cloud.google.com/pubsub/docs/subscribe-best-practices">Best practices to subscribe</a> · <a href="https://cloud.google.com/pubsub/docs/overview">What is Pub/Sub?</a></p>
+    <p style="margin-top:14px;color:#9aa3b0">A beginner-friendly study guide to Pub/Sub best practices. Pub/Sub is a Google Cloud product.</p>
+  </footer>
+
+</div>
+</body>
+</html>
